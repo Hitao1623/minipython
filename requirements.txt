@@ -10,3 +10,7 @@ tenacity
 openai
 apscheduler
 rapidfuzz
+requests
+beautifulsoup4
+lxml
+pydantic
