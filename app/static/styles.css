@@ -1,0 +1,48 @@
+/* 你原本就有的两条，保留 */
+table[role="grid"] td, table[role="grid"] th { white-space: nowrap; }
+dialog { max-width: 720px; }
+
+/* 让 Load 按钮与输入框同高度与风格 */
+.btn-cell { display: flex; align-items: flex-end; }
+.btn-like-input {
+  width: 100%;
+  min-height: 44px;           /* 与表单控件一致 */
+  padding: 0 16px;
+  border-radius: .5rem;
+}
+
+/* Title 截断的 CSS 兜底，防止把最后一列挤没 */
+.title-cell a{
+  display: inline-block;
+  max-width: 56ch;            /* 视觉宽度限制 */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 最后一列（AI 按钮）更紧凑且始终可见 */
+#tbl td:last-child, #tbl th:last-child {
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* 新增：只把按钮“高度”做成控件高度，宽度不动（AI/Close 共用） */
+.btn-height {
+  min-height: 44px;
+}
+
+/* 新增：AI 按钮的内边距，按内容宽度展示 */
+.ai-btn {
+  padding: 0 18px;
+}
+
+/* 让 Load、AI、Close 按钮高度保持一致 */
+button,
+.btn-like-input,
+#tbl button,
+dialog footer button {
+  min-height: 44px;   /* 和 select 高度一致 */
+  padding: 0 16px;
+  border-radius: .5rem;
+}
+

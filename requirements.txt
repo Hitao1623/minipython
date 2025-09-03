@@ -1,0 +1,12 @@
+fastapi
+uvicorn[standard]
+jinja2
+httpx
+pydantic-settings
+SQLAlchemy
+alembic
+python-dotenv
+tenacity
+openai
+apscheduler
+rapidfuzz

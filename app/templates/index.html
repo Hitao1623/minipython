@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% block content %}
+
+<form id="filters" class="grid">
+  <label>Timeframe
+    <select name="days">
+      <option value="1">Past 1 day</option>
+      <option value="3" selected>Past 3 days</option>
+      <option value="7">Past 7 days</option>
+    </select>
+  </label>
+  <label>Location
+    <select name="city">
+      {% for c in cities %}
+      <option value="{{c}}">{{c}}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>Work Mode
+    <select name="mode">
+      <option value="">Any</option>
+      <option value="remote">Remote</option>
+      <option value="hybrid">Hybrid</option>
+      <option value="onsite">Onsite</option>
+    </select>
+  </label>
+
+  <label class="btn-cell">
+    <button type="button" id="btnLoad" class="btn-like-input">Load</button>
+  </label>
+</form>
+
+<table id="tbl" role="grid">
+  <thead>
+    <tr>
+      <th>Title</th>
+      <th>Company</th>
+      <th>City</th>
+      <th>Mode</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
+<dialog id="dlg">
+  <article>
+    <header class="dlg-header"><strong>AI Analysis</strong></header>
+    <div id="dlgContent" class="ai-box"></div>
+    <footer class="dlg-footer">
+      <button class="btn-height" onclick="document.getElementById('dlg').close()">Close</button>
+    </footer>
+  </article>
+</dialog>
+
+<style>
+  /* 标题和页脚高度保持一致 */
+  .dlg-header, .dlg-footer {
+    height: 60px;
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    background: #f7f7f7;
+    border-bottom: 1px solid #ddd;
+  }
+  .dlg-footer {
+    border-top: 1px solid #ddd;
+    border-bottom: none;
+    justify-content: flex-end;
+  }
+
+  .ai-box {
+    font-family: monospace;
+    white-space: pre-wrap;
+    word-break: normal;
+    line-height: 1;
+    padding: 0;
+  }
+  .ai-field {
+    margin-bottom: 2px;  /* 四个部分之间留更明显的间距 */
+    display: block;
+  }
+</style>
+
+<script>
+function truncateTitle(title, maxLen=50){
+  if(!title) return "";
+  return title.length > maxLen ? title.slice(0, maxLen) + "…" : title;
+}
+
+function wrapAtWords(str, width = 100){   // ⬅ 改成 100
+  if(!str) return "";
+  const words = str.split(/\s+/);
+  const lines = [];
+  let line = "";
+  for(const w of words){
+    if(line.length === 0){
+      line = w;
+      continue;
+    }
+    if((line.length + 1 + w.length) <= width){
+      line += " " + w;
+    }else{
+      lines.push(line);
+      line = w;
+    }
+  }
+  if(line) lines.push(line);
+  return lines.join("\n");
+}
+
+async function loadJobs(){
+  const f = new FormData(document.getElementById('filters'));
+  const qs = new URLSearchParams(f);
+  const r = await fetch(`/api/jobs?${qs.toString()}`);
+  const data = await r.json();
+  const tb = document.querySelector('#tbl tbody'); tb.innerHTML='';
+
+  for (const j of data){
+    const shownTitle = truncateTitle(j.title, 50);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="title-cell"><a href="${j.url}" target="_blank" title="${j.title}">${shownTitle}</a></td>
+      <td>${j.company||''}</td>
+      <td>${j.city||''}</td>
+      <td>${j.work_mode && j.work_mode !== 'unknown' ? j.work_mode : ''}</td>
+      <td><button data-id="${j.id}">AI</button></td>`;
+
+    tr.querySelector('button').onclick = async ()=>{
+      const res = await fetch('/api/ai/analyze',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({job_id:j.id, your_skills: []})
+      });
+      const a = await res.json();
+
+      const skillsRaw = Array.isArray(a.skills) && a.skills.length ? a.skills.join(', ') : 'not mentioned';
+      const skillsLine = wrapAtWords(skillsRaw, 100);
+      const yearsLine  = a.years_experience_required || 'not mentioned';
+      const typeLine   = (a.type && a.type !== 'unknown') ? a.type : 'not mentioned';
+      const salaryLine = a.salary || 'not mentioned';
+
+      document.getElementById('dlgContent').innerHTML = `
+        <span class="ai-field">Skills: ${skillsLine}</span>
+        <span class="ai-field">Years of experience required: ${yearsLine}</span>
+        <span class="ai-field">Type: ${typeLine}</span>
+        <span class="ai-field">Salary: ${salaryLine}</span>
+      `;
+      document.getElementById('dlg').showModal();
+    };
+    tb.appendChild(tr);
+  }
+}
+
+document.getElementById('btnLoad').onclick = loadJobs;
+window.onload = loadJobs;
+</script>
+
+{% endblock %}
