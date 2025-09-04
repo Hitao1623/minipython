@@ -9,7 +9,7 @@ class Job(Base):
     source_job_id = Column(String(200), index=True)
     title = Column(String(300), index=True)
     company = Column(String(300), index=True)
-    location = Column(String(300), index=True)
+    city = Column(String(300), index=True)
     city = Column(String(120), index=True)
     country = Column(String(50), default="CA", index=True)
     url = Column(String(1000))

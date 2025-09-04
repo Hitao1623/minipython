@@ -1,10 +1,20 @@
+# app/main.py
+from __future__ import annotations
+
 import asyncio
 from datetime import datetime, timedelta
+from pathlib import Path
+
 from fastapi import FastAPI, Depends, Query, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
+from sqlalchemy.engine.url import make_url
+
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from sqlalchemy import or_, func
 
 from .config import settings
 from .db import Base, engine, SessionLocal
@@ -12,9 +22,7 @@ from .models import Job
 from .schemas import JobOut, AIAnalyzeIn, AIAnalyzeOut
 from .services.ingest import fetch_all, upsert_jobs
 from .services.ai import analyze
-from pathlib import Path
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
+
 
 BASE_DIR = Path(__file__).resolve().parent        # app/
 STATIC_DIR = BASE_DIR / "static"                  # app/static
@@ -22,7 +30,6 @@ TEMPLATES_DIR = BASE_DIR / "templates"            # app/templates
 
 app = FastAPI(title="Canada Developer Jobs")
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
-
 tpl = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 def get_db():
@@ -34,14 +41,25 @@ def get_db():
 
 @app.on_event("startup")
 async def on_start():
+    try:
+        url = make_url(str(engine.url))
+        if url.get_backend_name() == "sqlite" and url.database:
+            db_path = Path(url.database).resolve()
+            print(f"[DB] Using SQLite at: {db_path} (exists={db_path.exists()})")
+    except Exception as e:
+        print("[DB] failed to resolve db path:", e)
+
     Base.metadata.create_all(bind=engine)
+
     try:
         await cron_ingest()
     except Exception as e:
         print(f"[ingest] startup ingest failed: {e}")
+
     sched = AsyncIOScheduler()
     sched.add_job(lambda: asyncio.create_task(cron_ingest()), "interval", hours=6)
     sched.start()
+
 
 async def cron_ingest():
     items = await fetch_all(city=None, days=3)
@@ -49,9 +67,11 @@ async def cron_ingest():
         added = upsert_jobs(db, items)
         print(f"[ingest] added: {added}")
 
+
 @app.get("/", response_class=HTMLResponse)
 async def index(req: Request):
     return tpl.TemplateResponse("index.html", {"request": req, "cities": settings.CITIES})
+
 
 @app.get("/api/jobs", response_model=list[JobOut])
 def api_jobs(
@@ -97,6 +117,7 @@ def api_jobs(
         .all()
     )
     return [JobOut.model_validate(x) for x in rows]
+
 
 @app.post("/api/ai/analyze", response_model=AIAnalyzeOut)
 def api_ai_analyze(payload: AIAnalyzeIn, db: Session = Depends(get_db)):

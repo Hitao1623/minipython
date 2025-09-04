@@ -25,7 +25,7 @@
         <label class="label">Location</label>
         <div class="control">
           <div class="select is-fullwidth">
-            <select name="location">
+            <select name="city">
               {% for c in cities %}
               <option value="{{c}}">{{c}}</option>
               {% endfor %}
@@ -64,7 +64,7 @@
       <div class="column is-10">
         <label class="label">Keyword</label>
         <div class="control has-icons-left">
-          <input id="kw" class="input" type="text" placeholder="title / company / location / description">
+          <input id="kw" class="input" type="text" placeholder="title / company / city / description">
           <span class="icon is-left">
             <i class="fas fa-search"></i>
           </span>
@@ -166,7 +166,7 @@ async function loadJobs(page = 1){
     tr.innerHTML = `
       <td class="title-cell"><a href="${j.url}" target="_blank" title="${j.title}">${shownTitle}</a></td>
       <td>${j.company||''}</td>
-      <td>${j.location||''}</td>
+      <td>${j.city||''}</td>
       <td>${j.work_mode && j.work_mode !== 'unknown' ? j.work_mode : ''}</td>
       <td><button class="button is-small is-info ai-btn" data-id="${j.id}">AI</button></td>`;
 

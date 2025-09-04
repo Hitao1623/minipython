@@ -86,3 +86,60 @@ dialog footer button {
 }
 
 .section.page-section { padding-top: 0.75rem !important; }
+
+#tbl {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.table-container { overflow-x: hidden; }
+
+#tbl {
+  table-layout: fixed;
+  width: 100%;
+  border-collapse: collapse;
+}
+
+#tbl th,
+#tbl td {
+  box-sizing: border-box;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#tbl th:nth-child(1),
+#tbl td:nth-child(1) {
+  width: 35% !important;
+  text-align: left !important;
+}
+
+#tbl th:nth-child(2),
+#tbl td:nth-child(2) {
+  width: 23% !important;
+  text-align: center !important;
+}
+
+#tbl th:nth-child(3),
+#tbl td:nth-child(3) {
+  width: 18% !important;
+  text-align: center !important;
+}
+
+#tbl th:nth-child(4),
+#tbl td:nth-child(4) {
+  width: 10% !important;
+  text-align: center !important;
+}
+
+#tbl th:nth-child(5),
+#tbl td:nth-child(5) {
+  width: 13.5% !important;
+  text-align: right !important;
+}
+
+#tbl td:last-child .ai-btn {
+  display: inline-block;
+  min-width: 56px;
+  padding: 0 12px;
+}

@@ -7,7 +7,6 @@ from ..models import Job
 from ..providers.adzuna import AdzunaProvider
 
 async def fetch_all(city: str | None, days: int) -> list[dict]:
-
     provider = AdzunaProvider()
     items = await provider.search(
         titles=settings.DEFAULT_TITLES,
@@ -20,10 +19,8 @@ def make_dedup_key(title: str | None, company: str | None, city: str | None) -> 
     s = f"{(title or '').lower()}|{(company or '').lower()}|{(city or '').lower()}"
     return hashlib.sha1(s.encode()).hexdigest()
 
-
 def similar(a: str | None, b: str | None) -> bool:
     return fuzz.token_set_ratio(a or "", b or "") > 92
-
 
 def _unique_by_source_id(items: list[dict]) -> list[dict]:
     seen: set[tuple[str | None, str | None]] = set()
@@ -35,7 +32,6 @@ def _unique_by_source_id(items: list[dict]) -> list[dict]:
         seen.add(key)
         out.append(it)
     return out
-
 
 def upsert_jobs(db: Session, items: list[dict]) -> int:
     if not items:
@@ -70,7 +66,9 @@ def upsert_jobs(db: Session, items: list[dict]) -> int:
         if (src, sid) in existing_keys:
             continue
 
-        dedup = make_dedup_key(it.get("title"), it.get("company"), it.get("city"))
+        city_val = it.get("city") or it.get("location") or None
+
+        dedup = make_dedup_key(it.get("title"), it.get("company"), city_val)
         if db.query(Job.id).filter(Job.dedup_key == dedup).first():
             continue
 
@@ -79,8 +77,7 @@ def upsert_jobs(db: Session, items: list[dict]) -> int:
             source_job_id=sid,
             title=it.get("title"),
             company=it.get("company"),
-            location=it.get("location"),
-            city=it.get("city"),
+            city=city_val,
             country=it.get("country", "CA"),
             url=it.get("url"),
             description=it.get("description"),
