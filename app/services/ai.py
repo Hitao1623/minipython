@@ -1,4 +1,3 @@
-# app/services/ai.py
 from __future__ import annotations
 
 import re, html, unicodedata
@@ -6,21 +5,17 @@ from typing import Iterable, List, Optional, Dict, Tuple
 import requests
 from bs4 import BeautifulSoup
 
-# -------------------- 规范化工具 --------------------
 def _nfkc(s: str) -> str:
     return unicodedata.normalize("NFKC", s or "")
 
 def _norm_text(t: str) -> str:
-    """清洗 HTML 文本 -> 可搜索的纯文本"""
     t = _nfkc(html.unescape(t or ""))
     t = t.replace("\u2013", "-").replace("\u2014", "-").replace("\u2212", "-")  # – — − -> -
     t = t.replace("\u00A0", " ")
-    # 去项目符号、重复空白
     t = re.sub(r"[•·●▪▶►]+", " ", t)
     t = re.sub(r"\s+", " ", t)
     return t.strip()
 
-# -------------------- 抓整页正文 --------------------
 def _fetch_full_text(url: Optional[str]) -> str:
     if not url:
         return ""
@@ -29,10 +24,8 @@ def _fetch_full_text(url: Optional[str]) -> str:
         if r.status_code != 200:
             return ""
         soup = BeautifulSoup(r.text, "html.parser")
-        # 去掉无关标签
         for bad in soup(["script", "style", "noscript", "svg"]):
             bad.decompose()
-        # 选若干候选容器，取最长的几块
         cands = soup.find_all(["main", "article", "section", "div"], limit=80)
         chunks: List[str] = []
         for c in cands:
@@ -44,7 +37,6 @@ def _fetch_full_text(url: Optional[str]) -> str:
     except Exception:
         return ""
 
-# -------------------- Years of Experience --------------------
 _YEAR_PATS: List[re.Pattern] = [
     # 5-10 years / 5 – 10 years / 5 to 10 years
     re.compile(r"\b(\d{1,2})\s*(?:-|–|to|or)\s*(\d{1,2})\s*(?:\+)?\s*(?:years?|yrs?)\b", re.I),
@@ -88,19 +80,14 @@ def _extract_years(text: str) -> str:
                 seen.add(s); found.append((m.start(), s))
     if not found: return "not mentioned"
     found.sort(key=lambda x: x[0])
-    # 优先含 + 或范围的
     for _, s in found:
         if "–" in s or "+" in s:
             return s
     return found[0][1]
 
-# -------------------- Salary --------------------
 _SAL_PATS: List[re.Pattern] = [
-    # 范围 + 年薪单位
     re.compile(r"(?P<cur>\$|USD|CAD|C\$)?\s?(?P<a>\d{2,3}(?:,\d{3})?|(?:\d+)?k)\s*(?:-|–|to)\s*(?P<cur2>\$|USD|CAD|C\$)?\s?(?P<b>\d{2,3}(?:,\d{3})?|(?:\d+)?k)\s*(?P<unit>per\s*year|/year|year|annum|annual)?", re.I),
-    # 时薪（范围或单值）
     re.compile(r"(?P<cur>\$|USD|CAD|C\$)?\s?(?P<a>\d{1,3})(?:\s*(?:-|–|to)\s*(?P<b>\d{1,3}))?\s*(?P<u>per\s*hour|/hour|hour|hr|/hr)\b", re.I),
-    # 单值年薪
     re.compile(r"(?P<cur>\$|USD|CAD|C\$)?\s?(?P<a>\d{2,3}(?:,\d{3})?|(?:\d+)?k)\s*(?P<unit>per\s*year|/year|year|annum|annual)\b", re.I),
 ]
 
@@ -131,7 +118,6 @@ def _extract_salary(text: str) -> str:
         return f"{core.strip()} {unit}".strip()
     return "not mentioned"
 
-# -------------------- Type (remote/hybrid/onsite) --------------------
 _REMOTE_PH = [
     r"\bremote(-first)?\b", r"work\s+from\s+home", r"\bWFH\b", r"\banywhere\b",
     r"fully\s+remote", r"remote\s+within\s+canada", r"remote\s+across"
@@ -147,19 +133,14 @@ _ONSITE_PH = [
 def _detect_type(text: str) -> str:
     if not text: return "not mentioned"
     t = _norm_text(text).lower()
-    # 强匹配 remote
     for p in _REMOTE_PH:
         if re.search(p, t): return "remote"
-    # hybrid
     for p in _HYBRID_PH:
         if re.search(p, t): return "hybrid"
-    # onsite（若提到 on-site 但也提到 remote 的天数，优先 hybrid）
     if any(re.search(p, t) for p in _ONSITE_PH):
         return "onsite"
     return "not mentioned"
 
-# -------------------- Skills --------------------
-# 轻量词表（可按需扩充）
 _TECH_TERMS = [
     # languages
     "python","java","javascript","typescript","c#",".net",".net core","c++","go","golang","rust","ruby","php","kotlin","swift",
@@ -181,7 +162,6 @@ _TECH_TERMS = [
 ]
 
 def _term_regex(term: str) -> re.Pattern:
-    # 空格/连字符/下划线/斜线 视作等价分隔符
     pat = re.escape(term)
     pat = pat.replace(r"\ ", r"[ \-_/]+")
     return re.compile(rf"(?<![A-Za-z0-9]){pat}(?![A-Za-z0-9])", re.I)
@@ -198,12 +178,10 @@ def _extract_skills(text: str, limit: int = 8) -> List[str]:
     t = _norm_text(text)
     hits: List[Tuple[int,str]] = []
 
-    # 1) 词表直接命中（按出现位置）
     for term, pat in _TERM_PATS:
         for m in pat.finditer(t):
             hits.append((m.start(), term))
 
-    # 2) “experience with …” 类短语抽取
     for m in _EXPER_PH.finditer(t):
         frag = m.group(1)
         parts = re.split(r",|/| and |\bor\b|;", frag, flags=re.I)
@@ -213,7 +191,6 @@ def _extract_skills(text: str, limit: int = 8) -> List[str]:
             if 2 <= len(s) <= 40 and re.search(r"[A-Za-z0-9]", s):
                 hits.append((m.start(), s))
 
-    # 去重按顺序
     seen, ordered = set(), []
     for _, s in sorted(hits, key=lambda x: x[0]):
         if s not in seen:
@@ -221,15 +198,8 @@ def _extract_skills(text: str, limit: int = 8) -> List[str]:
         if len(ordered) >= limit: break
     return ordered[:limit]
 
-# -------------------- 主入口 --------------------
 def analyze(job_text: str, your_skills: Iterable[str], *, url: Optional[str] = None) -> dict:
-    """
-    从整页（若提供 URL）或摘要中解析四块信息：
-    - skills: List[str]（最多 8 个）
-    - years_experience_required: str（如 "5–10 years" / "3+ years" / "not mentioned"）
-    - type: "remote" | "hybrid" | "onsite" | "not mentioned"
-    - salary: 简短人类可读字符串或 "not mentioned"
-    """
+
     base = ""
     page_text = _fetch_full_text(url) if url else ""
     if page_text:
@@ -249,7 +219,6 @@ def analyze(job_text: str, your_skills: Iterable[str], *, url: Optional[str] = N
             "salary": salary,
         }
     except Exception:
-        # 任何异常都返回兜底，保证接口不崩
         return {
             "skills": [],
             "years_experience_required": "not mentioned",

@@ -1,130 +1,174 @@
 {% extends "base.html" %}
 {% block content %}
 
-<form id="filters" class="grid">
-  <label>Timeframe
-    <select name="days">
-      <option value="1">Past 1 day</option>
-      <option value="3" selected>Past 3 days</option>
-      <option value="7">Past 7 days</option>
-    </select>
-  </label>
-  <label>Location
-    <select name="city">
-      {% for c in cities %}
-      <option value="{{c}}">{{c}}</option>
-      {% endfor %}
-    </select>
-  </label>
-  <label>Work Mode
-    <select name="mode">
-      <option value="">Any</option>
-      <option value="remote">Remote</option>
-      <option value="hybrid">Hybrid</option>
-      <option value="onsite">Onsite</option>
-    </select>
-  </label>
+<section class="section page-section">
+  <div class="container">
 
-  <label class="btn-cell">
-    <button type="button" id="btnLoad" class="btn-like-input">Load</button>
-  </label>
-</form>
+    <h1 class="page-title">Canada Developer Jobs</h1>
 
-<table id="tbl" role="grid">
-  <thead>
-    <tr>
-      <th>Title</th>
-      <th>Company</th>
-      <th>City</th>
-      <th>Mode</th>
-      <th></th>
-    </tr>
-  </thead>
-  <tbody></tbody>
-</table>
+    <form id="filters" class="columns is-variable is-3 is-multiline">
+
+      <div class="column is-3">
+        <label class="label">Timeframe</label>
+        <div class="control">
+          <div class="select is-fullwidth">
+            <select name="days">
+              <option value="1">Past 1 day</option>
+              <option value="3" selected>Past 3 days</option>
+              <option value="7">Past 7 days</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="column is-3">
+        <label class="label">Location</label>
+        <div class="control">
+          <div class="select is-fullwidth">
+            <select name="location">
+              {% for c in cities %}
+              <option value="{{c}}">{{c}}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="column is-3">
+        <label class="label">Work Mode</label>
+        <div class="control">
+          <div class="select is-fullwidth">
+            <select name="mode">
+              <option value="">Any</option>
+              <option value="remote">Remote</option>
+              <option value="hybrid">Hybrid</option>
+              <option value="onsite">Onsite</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="column is-3">
+        <label class="label">Per Page</label>
+        <div class="control">
+          <div class="select is-fullwidth">
+            <select id="pageSize">
+              <option>20</option>
+              <option selected>50</option>
+              <option>100</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="column is-10">
+        <label class="label">Keyword</label>
+        <div class="control has-icons-left">
+          <input id="kw" class="input" type="text" placeholder="title / company / location / description">
+          <span class="icon is-left">
+            <i class="fas fa-search"></i>
+          </span>
+        </div>
+      </div>
+
+      <div class="column is-2 is-flex is-align-items-flex-end">
+        <button type="button" id="btnLoad" class="button is-info is-fullwidth btn-height">Load</button>
+      </div>
+    </form>
+
+    <div class="table-container">
+      <table id="tbl" class="table is-striped is-hoverable is-fullwidth" role="grid">
+        <thead>
+          <tr>
+            <th>Title</th>
+            <th>Company</th>
+            <th>Location</th>
+            <th>Mode</th>
+            <th style="width:1%"></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <nav class="level mt-2">
+      <div class="level-left">
+        <div class="buttons">
+          <button class="button" id="btnPrev">‹ Prev</button>
+          <button class="button" id="btnNext">Next ›</button>
+        </div>
+      </div>
+      <div class="level-right">
+        <div class="level-item">
+          <span id="pageInfo" class="has-text-grey">Page 1</span>
+        </div>
+      </div>
+    </nav>
+
+  </div>
+</section>
 
 <dialog id="dlg">
   <article>
     <header class="dlg-header"><strong>AI Analysis</strong></header>
     <div id="dlgContent" class="ai-box"></div>
     <footer class="dlg-footer">
-      <button class="btn-height" onclick="document.getElementById('dlg').close()">Close</button>
+      <button class="button is-info btn-height" onclick="document.getElementById('dlg').close()">Close</button>
     </footer>
   </article>
 </dialog>
 
-<style>
-  /* 标题和页脚高度保持一致 */
-  .dlg-header, .dlg-footer {
-    height: 60px;
-    display: flex;
-    align-items: center;
-    padding: 0 10px;
-    background: #f7f7f7;
-    border-bottom: 1px solid #ddd;
-  }
-  .dlg-footer {
-    border-top: 1px solid #ddd;
-    border-bottom: none;
-    justify-content: flex-end;
-  }
-
-  .ai-box {
-    font-family: monospace;
-    white-space: pre-wrap;
-    word-break: normal;
-    line-height: 1;
-    padding: 0;
-  }
-  .ai-field {
-    margin-bottom: 2px;  /* 四个部分之间留更明显的间距 */
-    display: block;
-  }
-</style>
-
 <script>
+let curPage = 1;
+
 function truncateTitle(title, maxLen=50){
   if(!title) return "";
   return title.length > maxLen ? title.slice(0, maxLen) + "…" : title;
 }
 
-function wrapAtWords(str, width = 100){   // ⬅ 改成 100
+function wrapAtWords(str, width = 100){
   if(!str) return "";
   const words = str.split(/\s+/);
   const lines = [];
   let line = "";
-  for(const w of words){
-    if(line.length === 0){
-      line = w;
-      continue;
-    }
-    if((line.length + 1 + w.length) <= width){
-      line += " " + w;
-    }else{
-      lines.push(line);
-      line = w;
-    }
+  for (const w of words){
+    if (line.length === 0){ line = w; continue; }
+    if ((line.length + 1 + w.length) <= width){ line += " " + w; }
+    else { lines.push(line); line = w; }
   }
-  if(line) lines.push(line);
+  if (line) lines.push(line);
   return lines.join("\n");
 }
 
-async function loadJobs(){
+async function loadJobs(page = 1){
+  curPage = page;
   const f = new FormData(document.getElementById('filters'));
   const qs = new URLSearchParams(f);
-  const r = await fetch(`/api/jobs?${qs.toString()}`);
-  const data = await r.json();
-  const tb = document.querySelector('#tbl tbody'); tb.innerHTML='';
+  const pageSize = document.getElementById('pageSize').value || 50;
+  const kw = document.getElementById('kw').value || "";
 
+  qs.set("page", page);
+  qs.set("page_size", pageSize);
+  if (kw.trim()){
+    qs.set("q", kw.trim());
+  } else {
+    qs.delete("q");
+  }
+
+  const r = await fetch(`/api/jobs?${qs.toString()}`);
+  const total = parseInt(r.headers.get("X-Total-Count") || "0", 10);
+  const data = await r.json();
+
+  const tb = document.querySelector('#tbl tbody'); tb.innerHTML='';
   for (const j of data){
     const shownTitle = truncateTitle(j.title, 50);
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td class="title-cell"><a href="${j.url}" target="_blank" title="${j.title}">${shownTitle}</a></td>
       <td>${j.company||''}</td>
-      <td>${j.city||''}</td>
+      <td>${j.location||''}</td>
       <td>${j.work_mode && j.work_mode !== 'unknown' ? j.work_mode : ''}</td>
-      <td><button data-id="${j.id}">AI</button></td>`;
+      <td><button class="button is-small is-info ai-btn" data-id="${j.id}">AI</button></td>`;
 
     tr.querySelector('button').onclick = async ()=>{
       const res = await fetch('/api/ai/analyze',{
@@ -141,19 +185,36 @@ async function loadJobs(){
       const salaryLine = a.salary || 'not mentioned';
 
       document.getElementById('dlgContent').innerHTML = `
-        <span class="ai-field">Skills: ${skillsLine}</span>
-        <span class="ai-field">Years of experience required: ${yearsLine}</span>
-        <span class="ai-field">Type: ${typeLine}</span>
-        <span class="ai-field">Salary: ${salaryLine}</span>
+        <div class="ai-field"><strong>Skills:</strong> ${skillsLine}</div>
+        <div class="ai-field"><strong>Years of experience required:</strong> ${yearsLine}</div>
+        <div class="ai-field"><strong>Type:</strong> ${typeLine}</div>
+        <div class="ai-field"><strong>Salary:</strong> ${salaryLine}</div>
       `;
       document.getElementById('dlg').showModal();
     };
     tb.appendChild(tr);
   }
+
+  const pageInfo = document.getElementById('pageInfo');
+  const ps = parseInt(pageSize, 10);
+  const totalPages = Math.max(1, Math.ceil(total / ps));
+  pageInfo.textContent = `Page ${curPage} / ${totalPages} · ${total} results`;
+
+  document.getElementById('btnPrev').disabled = (curPage <= 1);
+  document.getElementById('btnNext').disabled = (curPage >= totalPages);
 }
 
-document.getElementById('btnLoad').onclick = loadJobs;
-window.onload = loadJobs;
+document.getElementById('btnLoad').onclick = () => loadJobs(1);
+document.getElementById('btnPrev').onclick = () => loadJobs(curPage - 1);
+document.getElementById('btnNext').onclick = () => loadJobs(curPage + 1);
+
+document.getElementById('kw').addEventListener('keydown', (e) => {
+  if(e.key === 'Enter'){ e.preventDefault(); loadJobs(1); }
+});
+
+document.getElementById('pageSize').addEventListener('change', () => loadJobs(1));
+
+window.onload = () => loadJobs(1);
 </script>
 
 {% endblock %}

@@ -23,12 +23,10 @@ def _work_mode_from_text(text: str) -> str:
     return "unknown"
 
 def _parse_created(val):
-    # 兼容：时间戳 或 ISO8601 字符串
     if isinstance(val, (int, float)):
         return datetime.fromtimestamp(val, tz=timezone.utc)
     if isinstance(val, str):
         try:
-            # 2025-08-31T20:22:11Z / 2025-08-31T20:22:11+00:00
             return datetime.fromisoformat(val.replace("Z", "+00:00"))
         except Exception:
             return None
@@ -45,21 +43,17 @@ class AdzunaProvider(Provider):
             return r.json()
 
     async def search(self, *, titles: list[str], city: str | None, days: int):
-        """
-        逐个 title 调用 Adzuna，再合并结果（避免在 what 里使用 OR）。
-        city 为 "Canada (All)" 或 None 时，不传 where 参数（全国）。
-        """
         results: list[JobItem] = []
         where_val = None if (not city or city.startswith("Canada")) else city
         since = datetime.now(timezone.utc) - timedelta(days=days)
 
-        seen_ids = set()  # 批次内按 source_job_id 去重
+        seen_ids = set()
 
         for title in titles:
             params = {
                 "app_id": settings.ADZUNA_APP_ID,
                 "app_key": settings.ADZUNA_APP_KEY,
-                "what": title,                 # 逐条搜索，不再拼 OR
+                "what": title,
                 "results_per_page": 50,
                 "sort_by": "date",
                 "content-type": "application/json",
@@ -75,7 +69,6 @@ class AdzunaProvider(Provider):
                 seen_ids.add(sid)
 
                 created = _parse_created(it.get("created"))
-                # 本地时间过滤：保留近 days 天；没有 created 的也保留（交给前端筛选）
                 if created and created < since:
                     continue
 

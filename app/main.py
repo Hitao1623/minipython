@@ -1,13 +1,10 @@
-# app/main.py
 import asyncio
 from datetime import datetime, timedelta
-from fastapi import FastAPI, Depends, Query, HTTPException, Request
+from fastapi import FastAPI, Depends, Query, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 
 from .config import settings
 from .db import Base, engine, SessionLocal
@@ -15,10 +12,18 @@ from .models import Job
 from .schemas import JobOut, AIAnalyzeIn, AIAnalyzeOut
 from .services.ingest import fetch_all, upsert_jobs
 from .services.ai import analyze
+from pathlib import Path
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+
+BASE_DIR = Path(__file__).resolve().parent        # app/
+STATIC_DIR = BASE_DIR / "static"                  # app/static
+TEMPLATES_DIR = BASE_DIR / "templates"            # app/templates
 
 app = FastAPI(title="Canada Developer Jobs")
-app.mount("/static", StaticFiles(directory="app/static"), name="static")
-tpl = Jinja2Templates(directory="app/templates")
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+tpl = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 def get_db():
     db = SessionLocal()
@@ -30,12 +35,10 @@ def get_db():
 @app.on_event("startup")
 async def on_start():
     Base.metadata.create_all(bind=engine)
-    # 启动先抓一批，避免空白
     try:
         await cron_ingest()
     except Exception as e:
         print(f"[ingest] startup ingest failed: {e}")
-    # 间隔抓取
     sched = AsyncIOScheduler()
     sched.add_job(lambda: asyncio.create_task(cron_ingest()), "interval", hours=6)
     sched.start()
@@ -52,32 +55,58 @@ async def index(req: Request):
 
 @app.get("/api/jobs", response_model=list[JobOut])
 def api_jobs(
+    response: Response,
     days: int = Query(3, ge=1, le=30),
     city: str = Query("Canada (All)"),
     mode: str | None = Query(None),
+    q: str | None = Query(None, description="keyword search: title/company/city/description"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
 ):
-    q = db.query(Job).filter(Job.country == "CA")
+    base_q = db.query(Job).filter(Job.country == "CA")
+
     if city and not city.startswith("Canada"):
-        q = q.filter(Job.city == city.split(",")[0].strip())
+        base_q = base_q.filter(Job.city == city.split(",")[0].strip())
+
     since = datetime.utcnow() - timedelta(days=days)
-    # posted_at 为 NULL 或 >= since 都保留
-    q = q.filter(or_(Job.posted_at.is_(None), Job.posted_at >= since))
+    base_q = base_q.filter(or_(Job.posted_at.is_(None), Job.posted_at >= since))
+
     if mode:
-        q = q.filter(Job.work_mode == mode)
-    q = q.order_by(Job.created_at.desc()).limit(300)
-    return [JobOut.model_validate(x) for x in q.all()]
+        base_q = base_q.filter(Job.work_mode == mode)
+
+    if q:
+        kw = f"%{q.strip()}%"
+        base_q = base_q.filter(
+            or_(
+                Job.title.ilike(kw),
+                Job.company.ilike(kw),
+                Job.city.ilike(kw),
+                Job.description.ilike(kw),
+            )
+        )
+
+    total = base_q.count()
+    response.headers["X-Total-Count"] = str(total)
+
+    offset = (page - 1) * page_size
+    rows = (
+        base_q.order_by(Job.created_at.desc())
+        .offset(offset)
+        .limit(page_size)
+        .all()
+    )
+    return [JobOut.model_validate(x) for x in rows]
 
 @app.post("/api/ai/analyze", response_model=AIAnalyzeOut)
 def api_ai_analyze(payload: AIAnalyzeIn, db: Session = Depends(get_db)):
     job = db.query(Job).filter(Job.id == payload.job_id).first()
     if not job:
         raise HTTPException(404, "job not found")
-    # 关键改动：把职位页 URL 传给 analyze，让其抓整页文本进行抽取
     res = analyze(
         job.description or f"{job.title} at {job.company}",
         payload.your_skills,
-        url=job.url,  # <—— 新增
+        url=job.url,
     )
     return AIAnalyzeOut(**res)
 

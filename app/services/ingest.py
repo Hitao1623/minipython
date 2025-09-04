@@ -1,22 +1,13 @@
-# app/services/ingest.py
 from __future__ import annotations
-
-from typing import List, Dict
 from sqlalchemy.orm import Session
 from rapidfuzz import fuzz
 import hashlib
-
 from ..config import settings
 from ..models import Job
 from ..providers.adzuna import AdzunaProvider
 
-
-# ---------- 拉取 ----------
 async def fetch_all(city: str | None, days: int) -> list[dict]:
-    """
-    仅调用 AdzunaProvider 获取职位列表。
-    city 为 None 或 "Canada (All)" 时，不限定城市（全国）。
-    """
+
     provider = AdzunaProvider()
     items = await provider.search(
         titles=settings.DEFAULT_TITLES,
@@ -25,21 +16,16 @@ async def fetch_all(city: str | None, days: int) -> list[dict]:
     )
     return items
 
-
-# ---------- 去重/工具 ----------
 def make_dedup_key(title: str | None, company: str | None, city: str | None) -> str:
-    """基于 标题+公司+城市 生成指纹，做软去重兜底。"""
     s = f"{(title or '').lower()}|{(company or '').lower()}|{(city or '').lower()}"
     return hashlib.sha1(s.encode()).hexdigest()
 
 
 def similar(a: str | None, b: str | None) -> bool:
-    """备用文本相似度（当前未在入库中使用，可保留以备扩展）。"""
     return fuzz.token_set_ratio(a or "", b or "") > 92
 
 
 def _unique_by_source_id(items: list[dict]) -> list[dict]:
-    """批次内按 (source, source_job_id) 去重，保留第一条。"""
     seen: set[tuple[str | None, str | None]] = set()
     out: list[dict] = []
     for it in items:
@@ -51,21 +37,12 @@ def _unique_by_source_id(items: list[dict]) -> list[dict]:
     return out
 
 
-# ---------- 入库 ----------
 def upsert_jobs(db: Session, items: list[dict]) -> int:
-    """
-    仅插入数据库中不存在的记录：
-    1) 先在批次内按 (source, source_job_id) 去重；
-    2) 批量查询库里已有的 (source, source_job_id)；
-    3) 若库中存在则跳过；否则按 dedup_key（标题+公司+城市）再做兜底去重后插入。
-    """
     if not items:
         return 0
 
-    # 1) 批次内去重
     items = _unique_by_source_id(items)
 
-    # 2) 批量查出现有 (source, source_job_id)
     src_ids = [
         (it["source"], it["source_job_id"])
         for it in items
@@ -84,7 +61,6 @@ def upsert_jobs(db: Session, items: list[dict]) -> int:
             )
             existing_keys.update((s, sid) for s, sid in q.all())
 
-    # 3) 逐条插入（存在则跳过）
     added = 0
     for it in items:
         src = it.get("source")
@@ -118,7 +94,6 @@ def upsert_jobs(db: Session, items: list[dict]) -> int:
         db.add(job)
         added += 1
 
-    # 4) 提交
     try:
         db.commit()
     except Exception:

@@ -1,48 +1,88 @@
-/* 你原本就有的两条，保留 */
 table[role="grid"] td, table[role="grid"] th { white-space: nowrap; }
 dialog { max-width: 720px; }
 
-/* 让 Load 按钮与输入框同高度与风格 */
-.btn-cell { display: flex; align-items: flex-end; }
-.btn-like-input {
-  width: 100%;
-  min-height: 44px;           /* 与表单控件一致 */
-  padding: 0 16px;
-  border-radius: .5rem;
+.section.page-section { padding-top: 0.75rem !important; }
+.page-title {
+  font-size: clamp(30px, 4vw, 40px) !important;
+  font-weight: 800 !important;
+  margin: 0 0 14px 0 !important;
+  letter-spacing: .2px;
 }
 
-/* Title 截断的 CSS 兜底，防止把最后一列挤没 */
+.btn-height { min-height: 44px; }
+
 .title-cell a{
   display: inline-block;
-  max-width: 56ch;            /* 视觉宽度限制 */
+  max-width: 56ch;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-/* 最后一列（AI 按钮）更紧凑且始终可见 */
 #tbl td:last-child, #tbl th:last-child {
   text-align: right;
   white-space: nowrap;
 }
 
-/* 新增：只把按钮“高度”做成控件高度，宽度不动（AI/Close 共用） */
-.btn-height {
-  min-height: 44px;
+.ai-btn { padding: 0 18px; }
+
+dialog article > header.dlg-header,
+dialog article > footer.dlg-footer {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding-block: 8px !important;
+  padding-inline: 16px !important;
+  min-height: 60px !important;
+  background: #f7f7f7;
+  box-sizing: border-box;
+}
+dialog article > header.dlg-header { border-bottom: 1px solid #ddd; }
+dialog article > footer.dlg-footer {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  padding-block: 8px !important;
+  padding-inline: 16px !important;
+  min-height: 60px !important;
+  background: #f7f7f7;
+  border-top: 1px solid #ddd;
+  box-sizing: border-box;
 }
 
-/* 新增：AI 按钮的内边距，按内容宽度展示 */
-.ai-btn {
-  padding: 0 18px;
+dialog article > header.dlg-header * {
+  margin: 0 !important;
+  line-height: 1.2;
 }
 
-/* 让 Load、AI、Close 按钮高度保持一致 */
+.ai-box {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  white-space: pre-wrap;
+  word-break: normal;
+  line-height: 0.8;
+  padding: 0 12px;
+}
+.ai-box .ai-field{
+  display: block;
+  margin: 0;
+}
+.ai-box strong { font-weight: 700; }
+
 button,
-.btn-like-input,
 #tbl button,
 dialog footer button {
-  min-height: 44px;   /* 和 select 高度一致 */
+  min-height: 44px;
   padding: 0 16px;
   border-radius: .5rem;
 }
 
+.section.page-section .container .page-title,
+#page-title-main {
+  font-size: 40px !important;
+  font-weight: 400 !important;
+  margin-top: 0 !important;
+  margin-bottom: 40px !important;
+  letter-spacing: .2px;
+}
+
+.section.page-section { padding-top: 0.75rem !important; }
